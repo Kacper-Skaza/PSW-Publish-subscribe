@@ -1,5 +1,5 @@
-<h1 style="text-align: center;">Publish-subscribe (20 pkt)</h1>
-<h3 style="text-align: center;">
+<h1 align="center">Publish-subscribe (20 pkt)</h1>
+<h3 align="center">
 Programowanie systemowe i współbieżne<br>
 Kacper Skaza 160 174<br>
 &lt;kacper.skaza@student.put.poznan.pl&gt;<br>
@@ -23,16 +23,16 @@ potrzebnych zasobów, gdyż przy wywoływaniu funkcji wystarczy podać wskaźnik
 ```C
 typedef struct TQueue
 {
-	pthread_t *subscribers;			// Tablica watkow subskrybujacych
-	void **messages;				// Tablica wskaznikow na wiadomosci
-	int *message_register;			// Tablica licznikow odczytanych wiadomosci dla watkow
+	pthread_t *subscribers;		// Tablica watkow subskrybujacych
+	void **messages;		// Tablica wskaznikow na wiadomosci
+	int *message_register;		// Tablica licznikow odczytanych wiadomosci dla watkow
 
-	void *last_message;				// Wskaznik na ostatnia wyslana wiadomosc
-	int subscriber_count;			// Liczba subskrybentow
-	int message_count;				// Liczba przechowywanych wiadomosci
-	int size;						// Rozmiar kolejki
+	void *last_message;		// Wskaznik na ostatnia wyslana wiadomosc
+	int subscriber_count;		// Liczba subskrybentow
+	int message_count;		// Liczba przechowywanych wiadomosci
+	int size;			// Rozmiar kolejki
 
-	pthread_mutex_t lock;			// Mutex do synchronizacji
+	pthread_mutex_t lock;		// Mutex do synchronizacji
 	pthread_cond_t cond_not_full;	// Zmienna warunkowa dla niepelnej kolejki
 	pthread_cond_t cond_not_empty;	// Zmienna warunkowa dla niepustej kolejki
 } TQueue;
@@ -84,31 +84,31 @@ z kolejki, począwszy od najstarszych
 
 ```C
 ─────────────────────────────────────────────────────────────────────
-Faza	Wątek T₁		Wątek T₂		Wątek T₃		Wątek T₄
+Faza	Wątek T₁	Wątek T₂	Wątek T₃	Wątek T₄
 ─────────────────────────────────────────────────────────────────────
-1: 		put(m₁)
-2: 						subscribe()
-3: 		put(m₂)
-4: 						1←getAvail() 	subscribe()
-5: 										get()
-6: 						m₂←get() 		│
-7: 						get() 			│
-8: 		put(m₃) 		│ 				│
-9: 						m₃← 			m₃←
+1: 	put(m₁)
+2: 			subscribe()
+3: 	put(m₂)
+4: 			1←getAvail() 	subscribe()
+5: 					get()
+6: 			m₂←get() 	│
+7: 			get() 		│
+8: 	put(m₃) 	│ 		│
+9: 			m₃← 		m₃←
 10: 	setSize(2)
 11: 	put(m₄)
-12: 					1←getAvail() 	1←getAvail() 	subscribe()
+12: 			1←getAvail() 	1←getAvail() 	subscribe()
 13: 	put(m₅)
-14: 	put(m₆) 		2←getAvail() 	2←getAvail()	1←getAvail()
-15: 	│ 												unsubscribe()
-16: 	│ 								m₄←get()
-17: 	┴ 				m₄←get()
-18: 									unsubscribe()
+14: 	put(m₆) 	2←getAvail() 	2←getAvail()	1←getAvail()
+15: 	│ 						unsubscribe()
+16: 	│ 				m₄←get()
+17: 	┴ 		m₄←get()
+18: 					unsubscribe()
 19: 	put(m₇)
-20: 	│ 				2←getAvail()
-21: 	┴ 				m₅←get()
-22: 					m₆←get()
-23: 					m₇←get()
+20: 	│ 		2←getAvail()
+21: 	┴ 		m₅←get()
+22: 			m₆←get()
+23: 			m₇←get()
 ─────────────────────────────────────────────────────────────────────
 ```
 
