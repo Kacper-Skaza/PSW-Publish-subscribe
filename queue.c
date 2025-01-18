@@ -2,18 +2,25 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
-#include "list.h"
+#include "queue.h"
 
-int createQueue(TQueue *queue, int size)
+TQueue* createQueue(int size)
 {
 	if (size < 0)
-		return -1;
+	{
+		return NULL;
+	}
+
+	TQueue *queue = (TQueue *)malloc(sizeof(TQueue));
+	if (queue == NULL)
+	{
+		return NULL;
+	}
 
 	queue->subscribers = NULL;
 	queue->messages = (void **)malloc(sizeof(void *) * size);
 	queue->message_register = NULL;
 
-	queue->last_message = NULL;
 	queue->subscriber_count = 0;
 	queue->message_count = 0;
 	queue->size = size;
@@ -22,10 +29,10 @@ int createQueue(TQueue *queue, int size)
 	pthread_cond_init(&queue->cond_not_full, NULL);
 	pthread_cond_init(&queue->cond_not_empty, NULL);
 
-	return 0;
+	return queue;
 }
 
-int destroyQueue(TQueue *queue)
+void destroyQueue(TQueue *queue)
 {
 	pthread_mutex_lock(&queue->lock);
 
@@ -37,18 +44,15 @@ int destroyQueue(TQueue *queue)
 	free(queue->subscribers);
 	free(queue->messages);
 	free(queue->message_register);
-	free(queue->last_message);
 
 	pthread_cond_destroy(&queue->cond_not_full);
 	pthread_cond_destroy(&queue->cond_not_empty);
 
 	pthread_mutex_unlock(&queue->lock);
 	pthread_mutex_destroy(&queue->lock);
-
-	return 0;
 }
 
-int subscribe(TQueue *queue, pthread_t *thread)
+void subscribe(TQueue *queue, pthread_t thread)
 {
 	pthread_mutex_lock(&queue->lock);
 
@@ -59,23 +63,22 @@ int subscribe(TQueue *queue, pthread_t *thread)
 	if (!queue->subscribers || !queue->message_register)
 	{
 		pthread_mutex_unlock(&queue->lock);
-		return -1;
+		return;
 	}
 
-	queue->subscribers[queue->subscriber_count - 1] = *thread; // Dodanie do listy subskrybentow
+	queue->subscribers[queue->subscriber_count - 1] = thread; // Dodanie do listy subskrybentow
 	queue->message_register[queue->subscriber_count - 1] = queue->message_count; // Uznanie wczesniejszych wiadomosci za przeczytane
 
 	pthread_mutex_unlock(&queue->lock);
-	return 0;
 }
 
-int unsubscribe(TQueue *queue, pthread_t *thread)
+void unsubscribe(TQueue *queue, pthread_t thread)
 {
 	pthread_mutex_lock(&queue->lock);
 
 	for (int i=0; i<queue->subscriber_count; i++)
 	{
-		if (pthread_equal(queue->subscribers[i], *thread))
+		if (pthread_equal(queue->subscribers[i], thread))
 		{
 			// Przesuniecie watkow
 			for (int j=i; j<queue->subscriber_count-1; j++)
@@ -109,16 +112,15 @@ int unsubscribe(TQueue *queue, pthread_t *thread)
 
 			// Sukces
 			pthread_mutex_unlock(&queue->lock);
-			return 0;
+			return;
 		}
 	}
 
 	// Ten watek nie byl subskrybentem
 	pthread_mutex_unlock(&queue->lock);
-	return -1;
 }
 
-int addMsg(TQueue *queue, void *msg)
+void addMsg(TQueue *queue, void *msg)
 {
 	pthread_mutex_lock(&queue->lock);
 
@@ -126,7 +128,7 @@ int addMsg(TQueue *queue, void *msg)
 	if (queue->subscriber_count <= 0)
 	{
 		pthread_mutex_unlock(&queue->lock);
-		return 0;
+		return;
 	}
 
 	// Czekaj jesli kolejka jest pelna
@@ -144,10 +146,9 @@ int addMsg(TQueue *queue, void *msg)
 
 	// Sukces
 	pthread_mutex_unlock(&queue->lock);
-	return 0;
 }
 
-void *getMsg(TQueue *queue, pthread_t *thread)
+void* getMsg(TQueue *queue, pthread_t thread)
 {
 	pthread_mutex_lock(&queue->lock);
 
@@ -155,7 +156,7 @@ void *getMsg(TQueue *queue, pthread_t *thread)
 	int subscriber_index = -1;
 	for (int i=0; i<queue->subscriber_count; i++)
 	{
-		if (pthread_equal(queue->subscribers[i], *thread))
+		if (pthread_equal(queue->subscribers[i], thread))
 		{
 			subscriber_index = i;
 			break;
@@ -173,14 +174,8 @@ void *getMsg(TQueue *queue, pthread_t *thread)
 		pthread_cond_wait(&queue->cond_not_empty, &queue->lock);
 	}
 
-	// Pobierz wiadomosc i sprawdz jej rozmiar
+	// Pobierz wiadomosc
 	void *msg = queue->messages[queue->message_register[subscriber_index]];
-	size_t msg_size = strlen((char*)msg) + 1;
-
-	// Zrob kopie
-	free(queue->last_message);
-	queue->last_message = malloc(msg_size);
-	memcpy(queue->last_message, msg, msg_size);
 	queue->message_register[subscriber_index]++;
 
 	// Jesli najstarsza wiadomosc zostala odczytana przez wszystkie watki
@@ -203,10 +198,10 @@ void *getMsg(TQueue *queue, pthread_t *thread)
 
 	// Sukces
 	pthread_mutex_unlock(&queue->lock);
-	return queue->last_message;
+	return msg;
 }
 
-int getAvailable(TQueue *queue, pthread_t *thread)
+int getAvailable(TQueue *queue, pthread_t thread)
 {
 	pthread_mutex_lock(&queue->lock);
 
@@ -214,7 +209,7 @@ int getAvailable(TQueue *queue, pthread_t *thread)
 	int subscriber_index = -1;
 	for (int i=0; i<queue->subscriber_count; i++)
 	{
-		if (pthread_equal(queue->subscribers[i], *thread))
+		if (pthread_equal(queue->subscribers[i], thread))
 		{
 			subscriber_index = i;
 			break;
@@ -234,7 +229,7 @@ int getAvailable(TQueue *queue, pthread_t *thread)
 	return available;
 }
 
-int removeMsg(TQueue *queue, void *msg)
+void removeMsg(TQueue *queue, void *msg)
 {
 	// Brak blokady
 	//pthread_mutex_lock(&queue->lock);
@@ -246,14 +241,15 @@ int removeMsg(TQueue *queue, void *msg)
 		if (queue->messages[i] == msg)
 		{
 			found = i;
-			free(queue->messages[i]);
+			// Interfejs nie odpowiada za zwalnianie pamieci
+			//free(queue->messages[i]);
 			break;
 		}
 	}
 	if (found == -1) // Wiadomosci nie ma w kolejce
 	{
 		pthread_mutex_unlock(&queue->lock);
-		return -1;
+		return;
 	}
 
 	// Przesuniece wiadomosci
@@ -277,17 +273,16 @@ int removeMsg(TQueue *queue, void *msg)
 
 	// Brak blokady
 	//pthread_mutex_unlock(&queue->lock);
-	return 0;
 }
 
-int setSize(TQueue *queue, int size)
+void setSize(TQueue *queue, int size)
 {
 	pthread_mutex_lock(&queue->lock);
 
 	if (size < 0)
 	{
 		pthread_mutex_unlock(&queue->lock);
-		return -1;
+		return;
 	}
 
 	// Jesli nowy rozmiar jest mniejszy niz ilosc wiadomosci
@@ -324,7 +319,7 @@ int setSize(TQueue *queue, int size)
 	if (queue->messages == NULL)
 	{
 		pthread_mutex_unlock(&queue->lock);
-		return -1;
+		return;
 	}
 
 	// Ustaw rozmiar
@@ -336,6 +331,5 @@ int setSize(TQueue *queue, int size)
 
 	// Sukces
 	pthread_mutex_unlock(&queue->lock);
-	return 0;
 }
 

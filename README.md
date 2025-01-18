@@ -3,20 +3,20 @@
 Programowanie systemowe i współbieżne<br>
 Kacper Skaza 160 174<br>
 &lt;kacper.skaza@student.put.poznan.pl&gt;<br>
-v1.0, 2025-01-06
+v1.1, 2025-01-18
 </h3>
 
 
 
 Projekt jest dostępny w repozytorium pod adresem:<br>
-<https://github.com/Kacper-Skaza/Publish-subscribe-PSiW>
+<https://github.com/Kacper-Skaza/PSW-Publish-subscribe>
 
 
 
 # Struktury danych
 
-Cała kolejka jest definiowana strukturą `TQueue`. pozwala to na łatwy dostęp do
-potrzebnych zasobów, gdyż przy wywoływaniu funkcji wystarczy podać wskaźnik.
+Cała kolejka jest definiowana strukturą `TQueue`, co pozwala na łatwy dostęp
+do potrzebnych zasobów. Przy wywoływaniu funkcji wystarczy podać wskaźnik.
 
 - `TQueue`:
 
@@ -27,7 +27,6 @@ typedef struct TQueue
 	void **messages;		// Tablica wskaznikow na wiadomosci
 	int *message_register;		// Tablica licznikow odczytanych wiadomosci dla watkow
 
-	void *last_message;		// Wskaznik na ostatnia wyslana wiadomosc
 	int subscriber_count;		// Liczba subskrybentow
 	int message_count;		// Liczba przechowywanych wiadomosci
 	int size;			// Rozmiar kolejki
@@ -42,36 +41,36 @@ typedef struct TQueue
 
 # Funkcje
 
-- `createQueue(TQueue *queue, int *size)` —
-inicjuje strukturę `TQueue` reprezentującą nową kolejkę o początkowym,
-maksymalnym rozmiarze `size`.
+- `TQueue* createQueue(int size)` —
+tworzy nową kolejkę alokując pamięć dla struktury `TQueue`, reprezentującej
+nową kolejkę o początkowym, maksymalnym rozmiarze `size`.
 
 - `destroyQueue(TQueue *queue)` —
 usuwa kolejkę `queue` i zwalnia pamięć przez nią zajmowaną. Próba dostarczania
 lub odbioru nowych wiadomości z takiej kolejki będzie kończyła się błędem.
 
-- `subscribe(TQueue *queue, pthread_t *thread)` —
+- `subscribe(TQueue *queue, pthread_t thread)` —
 rejestruje wątek `thread` jako kolejnego odbiorcę wiadomości z kolejki `queue`.
 
-- `unsubscribe(TQueue *queue, pthread_t *thread)` —
+- `unsubscribe(TQueue *queue, pthread_t thread)` —
 wyrejestrowuje wątek `thread` z kolejki `queue`. Nieodebrane przez wątek
 wiadomości są traktowane jako odebrane.
 
 - `addMsg(TQueue *queue, void *msg)` —
 wstawia do kolejki `queue` nową wiadomość reprezentowaną wskaźnikiem `msg`.
 
-- `void* getMsg(TQueue *queue, pthread_t *thread)` —
+- `void* getMsg(TQueue *queue, pthread_t thread)` —
 odbiera pojedynczą wiadomość z kolejki `queue` dla wątku `thread`. Jeżeli nie ma
 nowych wiadomości, funkcja jest blokująca. Jeżeli wątek `thread` nie jest
 zasubskrybowany – zwracany jest pusty wskaźnik `NULL`.
 
-- `getAvailable(TQueue *queue, pthread_t *thread)` —
+- `getAvailable(TQueue *queue, pthread_t thread)` —
 zwraca liczbę wiadomości z kolejki `queue` dostępnych dla wątku `thread`.
 
 - `removeMsg(TQueue *queue, void *msg)` —
 usuwa wiadomość `msg` z kolejki.
 
-- `setSize(TQueue *queue, int *size)` —
+- `setSize(TQueue *queue, int size)` —
 ustala nowy, maksymalny rozmiar kolejki. Jeżeli nowy rozmiar jest mniejszy od
 aktualnej liczby wiadomości w kolejce, to nadmiarowe wiadomości są usuwane
 z kolejki, począwszy od najstarszych
@@ -129,8 +128,8 @@ Expected time: 3; Thread [1] is attempting to add message '2. Hello world!' to t
 Expected time: 3; Thread [1] successfully added message '2. Hello world!' to the queue.
 
 ========== 4 ==========
->> Expected time: 4; Thread [3] subscribed.
 Expected time: 4; Thread [2] has 1 messages available [Expected result: 1].
+>> Expected time: 4; Thread [3] subscribed.
 
 ========== 5 ==========
 Expected time: 5; Thread [3] attempting to receive message.
@@ -144,9 +143,9 @@ Expected time: 7; Thread [2] attempting to receive message.
 
 ========== 8 ==========
 Expected time: 8; Thread [1] is attempting to add message '3. Hello world!' to the queue.
-Expected time: 8; Thread [1] successfully added message '`mż \☺' to the queue.
-Expected time: 8; Thread [2] received message: '3. Hello world!'
+Expected time: 8; Thread [1] successfully added message '3. Hello world!' to the queue.
 Expected time: 8; Thread [3] received message: '3. Hello world!'
+Expected time: 8; Thread [2] received message: '3. Hello world!'
 
 ========== 9 ==========
 
@@ -168,8 +167,8 @@ Expected time: 13; Thread [1] successfully added message '5. Hello world!' to th
 
 ========== 14 ==========
 Expected time: 14; Thread [4] has 1 messages available [Expected result: 1].
-Expected time: 14; Thread [3] has 2 messages available [Expected result: 2].
 Expected time: 14; Thread [2] has 2 messages available [Expected result: 2].
+Expected time: 14; Thread [3] has 2 messages available [Expected result: 2].
 Expected time: 14; Thread [1] is attempting to add message '6. Hello world!' to the queue.
 
 ========== 15 ==========

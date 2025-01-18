@@ -1,13 +1,11 @@
+# IDE directories
+.vscode/
+IDE/
+
+# IDE files
+*.dev
+*.layout
+
 # Compilation files
 *.o
 *.res
-*.exe
-
-# IDE files and directories
-*.dev
-*.layout
-*.vscode/
-
-# Temporary
-Publish-subscribe_private.*
-Makefile.win
