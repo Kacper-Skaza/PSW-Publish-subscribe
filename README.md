@@ -1,10 +1,7 @@
 <h1 align="center">Publish-subscribe (20 pkt)</h1>
-<h3 align="center">
-Programowanie systemowe i współbieżne<br>
-Kacper Skaza 160 174<br>
-&lt;kacper.skaza@student.put.poznan.pl&gt;<br>
-v1.1, 2025-01-18
-</h3>
+<h3 align="center">Programowanie systemowe i współbieżne <br> Kacper Skaza 160 174</h3>
+<h4 align="center">&lt;kacper.skaza@student.put.poznan.pl&gt; <br> v1.1, 2025-01-18</h4>
+<br>
 
 
 
@@ -21,8 +18,7 @@ do potrzebnych zasobów. Przy wywoływaniu funkcji wystarczy podać wskaźnik.
 - `TQueue`:
 
 ```C
-typedef struct TQueue
-{
+struct TQueue {
 	pthread_t *subscribers;		// Tablica watkow subskrybujacych
 	void **messages;		// Tablica wskaznikow na wiadomosci
 	int *message_register;		// Tablica licznikow odczytanych wiadomosci dla watkow
@@ -34,7 +30,8 @@ typedef struct TQueue
 	pthread_mutex_t lock;		// Mutex do synchronizacji
 	pthread_cond_t cond_not_full;	// Zmienna warunkowa dla niepelnej kolejki
 	pthread_cond_t cond_not_empty;	// Zmienna warunkowa dla niepustej kolejki
-} TQueue;
+};
+typedef struct TQueue TQueue;
 ```
 
 
@@ -108,7 +105,6 @@ Faza	Wątek T₁	Wątek T₂	Wątek T₃	Wątek T₄
 21: 	┴ 		m₅←get()
 22: 			m₆←get()
 23: 			m₇←get()
-─────────────────────────────────────────────────────────────────────
 ```
 
 * Dane wyjściowe:
