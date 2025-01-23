@@ -10,7 +10,7 @@ void* timer(void *arg)
 
 	for (int i=1; i<=30; i++)
 	{
-		printf("\n========== %d ==========\n", i);
+		printf("\n======== %d ========\n", i);
 		sleep(1);
 	}
 
@@ -19,7 +19,7 @@ void* timer(void *arg)
 
 void* thread_func_1(void *arg)
 {
-	pthread_t thread_ID = pthread_self()-1; // ID watku
+	pthread_t thread_ID = pthread_self(); // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 	void *msg = NULL; // Wiadomosc
 
@@ -68,14 +68,13 @@ void* thread_func_1(void *arg)
 	printf("Expected time: 19; Thread [%llu] is attempting to add message '%s' to the queue.\n", thread_ID, (char*)msg);
 	addMsg(queue, msg);
 	printf("Expected time: 21; Thread [%llu] successfully added message '%s' to the queue.\n", thread_ID, (char*)msg);
-	printf(">> Expected time: 21; Thread [%llu] ended.\n", thread_ID);
 
 	return NULL;
 }
 
 void* thread_func_2(void *arg)
 {
-	pthread_t thread_ID = pthread_self()-1; // ID watku
+	pthread_t thread_ID = pthread_self(); // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 
 	sleep(2); // 0 -> 2
@@ -120,15 +119,14 @@ void* thread_func_2(void *arg)
 
 	sleep(0); // 23
 	unsubscribe(queue, thread_ID);
-	printf(">> Expected time: 23; Thread [%llu] unsubscribed.\n", thread_ID);
-	printf(">> Expected time: 23; Thread [%llu] ended.\n", thread_ID);
+	printf(">> Expected time: 23; Thread [%llu] unsubscribed and ended.\n", thread_ID);
 
 	return NULL;
 }
 
 void* thread_func_3(void *arg)
 {
-	pthread_t thread_ID = pthread_self()-1; // ID watku
+	pthread_t thread_ID = pthread_self(); // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 
 	sleep(4); // 0 -> 4
@@ -151,15 +149,14 @@ void* thread_func_3(void *arg)
 
 	sleep(2); // 16 -> 18
 	unsubscribe(queue, thread_ID);
-	printf(">> Expected time: 18; Thread [%llu] unsubscribed.\n", thread_ID);
-	printf(">> Expected time: 18; Thread [%llu] ended.\n", thread_ID);
+	printf(">> Expected time: 18; Thread [%llu] unsubscribed and ended.\n", thread_ID);
 
 	return NULL;
 }
 
 void* thread_func_4(void *arg)
 {
-	pthread_t thread_ID = pthread_self()-1; // ID watku
+	pthread_t thread_ID = pthread_self(); // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 
 	sleep(12); // 0 -> 12
@@ -171,41 +168,124 @@ void* thread_func_4(void *arg)
 
 	sleep(1); // 14 -> 15
 	unsubscribe(queue, thread_ID);
-	printf(">> Expected time: 15; Thread [%llu] unsubscribed.\n", thread_ID);
-	printf(">> Expected time: 15; Thread [%llu] ended.\n", thread_ID);
+	printf(">> Expected time: 15; Thread [%llu] unsubscribed and ended.\n", thread_ID);
 
 	return NULL;
+}
+
+void single_thread_test()
+{
+	pthread_t thread_ID=999;
+	const int QUEUE_SIZE=6;
+
+	// Tworzenie kolejki
+	TQueue *queue;
+	queue = createQueue(QUEUE_SIZE);
+	printf("Queue created with size %d\n", QUEUE_SIZE);
+
+	// Test wskaznikow
+	int *m, *p;
+	m = malloc(sizeof(int));
+	*m = 10;
+	subscribe(queue, thread_ID);
+	addMsg(queue, m);
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test pointers [Details: %d=%d && %p=%p]\n", (*m==*p && m==p), *m, *p, m, p);
+
+	// Test usuwania wiadomosci
+	int temp = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test message removal [Details: %d=%d]\n", (temp == 0), temp, 0);
+	unsubscribe(queue, thread_ID);
+
+	// Test zawartosci usunietych wiadomosci
+	printf("[Result: %d] Test content of deleted messages [Details: %d=%d && %p=%p]\n", (*m==*p && m==p), *m, *p, m, p);
+
+	// Test NULL w 'getMsg' i x<0 w 'getAvailable'
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test NULL in 'getMsg' [Details: %p=%p]\n", (p==NULL), p, NULL);
+	temp = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test x<0 in 'getAvailable' [Details: %d<%d]\n", (temp < 0), temp, 0);
+
+	// Test 'unsubscribe'
+	subscribe(queue, thread_ID);
+	addMsg(queue, m);
+	addMsg(queue, m);
+	addMsg(queue, m);
+	addMsg(queue, m);
+	unsubscribe(queue, thread_ID);
+	subscribe(queue, thread_ID);
+	addMsg(queue, m);
+	addMsg(queue, m);
+	temp = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test 'unsubscribe' [Details: %d=%d]\n", (temp == 2), temp, 2);
+	unsubscribe(queue, thread_ID);
+
+	// Test 'removeMsg'
+	p = malloc(sizeof(int));
+	*p = 20;
+	subscribe(queue, thread_ID);
+	addMsg(queue, p);
+	addMsg(queue, m);
+	removeMsg(queue, p);
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test 'removeMsg' [Details: %d=%d && %p=%p]\n", (*m==*p && m==p), *m, *p, m, p);
+	unsubscribe(queue, thread_ID);
+
+	// Test 'setSize'
+	p = malloc(sizeof(int));
+	*p = 20;
+	subscribe(queue, thread_ID);
+	addMsg(queue, p);
+	addMsg(queue, p);
+	addMsg(queue, m);
+	addMsg(queue, p);
+	addMsg(queue, p);
+	addMsg(queue, p);
+	setSize(queue, 4);
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test 'setSize' [Details: %d=%d && %p=%p]\n", (*m==*p && m==p), *m, *p, m, p);
+	unsubscribe(queue, thread_ID);
+
+	// Zniszczenie kolejki
+	destroyQueue(queue);
+	printf("[Result: 1] Test 'destroyQueue'\n\n");
 }
 
 
 
 int main()
 {
+	// Testy na pojedynczym watku
+	printf("========== SINGLE THREAD TEST ==========\n");
+	single_thread_test();
+
+	// Testy na wielu watkach
+	printf("========== MULTI THREAD TEST ==========\n");
 	const int THREADS_NUM=5, QUEUE_SIZE=1;
 	pthread_t threads[THREADS_NUM];
 
 	// Tworzenie kolejki
 	TQueue *queue;
 	queue = createQueue(QUEUE_SIZE);
-	printf("=== Queue created with size %d ===\n", QUEUE_SIZE);
-
-	// Tworzenie timera
-	pthread_create(&threads[0], NULL, timer, NULL);
+	printf("Queue created with size %d\n", QUEUE_SIZE);
 
 	// Tworzenie watkow
-	pthread_create(&threads[1], NULL, thread_func_1, queue);
-	pthread_create(&threads[2], NULL, thread_func_2, queue);
-	pthread_create(&threads[3], NULL, thread_func_3, queue);
-	pthread_create(&threads[4], NULL, thread_func_4, queue);
+	pthread_create(&threads[0], NULL, thread_func_1, queue);
+	pthread_create(&threads[1], NULL, thread_func_2, queue);
+	pthread_create(&threads[2], NULL, thread_func_3, queue);
+	pthread_create(&threads[3], NULL, thread_func_4, queue);
+
+	// Tworzenie timera
+	pthread_create(&threads[4], NULL, timer, NULL);
 
 	// Czekanie na zakonczenie watkow
-	for (int i=1; i<THREADS_NUM; i++)
+	for (int i=0; i<THREADS_NUM-1; i++)
 	{
 		pthread_join(threads[i], NULL);
 	}
 
 	// Zakonczenie timera
-	pthread_cancel(threads[0]);
+	pthread_cancel(threads[4]);
 
 	// Zniszczenie kolejki
 	destroyQueue(queue);

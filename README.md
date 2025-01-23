@@ -1,19 +1,18 @@
 <h1 align="center">Publish-subscribe (20 pkt)</h1>
 <h3 align="center">Programowanie systemowe i współbieżne <br> Kacper Skaza 160 174</h3>
-<h4 align="center">&lt;kacper.skaza@student.put.poznan.pl&gt; <br> v1.1, 2025-01-18</h4>
-<br>
+<h4 align="center">&lt;kacper.skaza@student.put.poznan.pl&gt; <br> v1.1, 2025-01-23</h4>
 
 
 
-Projekt jest dostępny w repozytorium pod adresem:<br>
+<br>Projekt jest dostępny w repozytorium pod adresem:<br>
 <https://github.com/Kacper-Skaza/PSW-Publish-subscribe>
 
 
 
 # Struktury danych
 
-Cała kolejka jest definiowana strukturą `TQueue`, co pozwala na łatwy dostęp
-do potrzebnych zasobów. Przy wywoływaniu funkcji wystarczy podać wskaźnik.
+Cała system dystrybucji wiadomości wykorzystuje strukturę `TQueue`. Pozwala ona na łatwy
+dostęp do potrzebnych zasobów, a przy wywoływaniu funkcji wystarczy podać wskaźnik.
 
 - `TQueue`:
 
@@ -78,19 +77,19 @@ z kolejki, począwszy od najstarszych
 
 * Dane wejściowe:
 
-```C
+```Python
 ─────────────────────────────────────────────────────────────────────
 Faza	Wątek T₁	Wątek T₂	Wątek T₃	Wątek T₄
 ─────────────────────────────────────────────────────────────────────
 1: 	put(m₁)
 2: 			subscribe()
 3: 	put(m₂)
-4: 			1←getAvail() 	subscribe()
+4: 			1←getAvail()	subscribe()
 5: 					get()
 6: 			m₂←get() 	│
 7: 			get() 		│
-8: 	put(m₃) 	│ 		│
-9: 			m₃← 		m₃←
+8: 	put(m₃) 	┴→m₃ 		┴→m₃
+9:
 10: 	setSize(2)
 11: 	put(m₄)
 12: 			1←getAvail() 	1←getAvail() 	subscribe()
@@ -109,100 +108,101 @@ Faza	Wątek T₁	Wątek T₂	Wątek T₃	Wątek T₄
 
 * Dane wyjściowe:
 
-```C
-=== Queue created with size 1 ===
+```PHP
+========== MULTI THREAD TEST ==========
+Queue created with size 1
 
-========== 1 ==========
+======== 1 ========
 Expected time: 1; Thread [1] is attempting to add message '1. Hello world!' to the queue.
 Expected time: 1; Thread [1] successfully added message '1. Hello world!' to the queue.
 
-========== 2 ==========
+======== 2 ========
 >> Expected time: 2; Thread [2] subscribed.
 
-========== 3 ==========
+======== 3 ========
 Expected time: 3; Thread [1] is attempting to add message '2. Hello world!' to the queue.
 Expected time: 3; Thread [1] successfully added message '2. Hello world!' to the queue.
 
-========== 4 ==========
-Expected time: 4; Thread [2] has 1 messages available [Expected result: 1].
+======== 4 ========
 >> Expected time: 4; Thread [3] subscribed.
+Expected time: 4; Thread [2] has 1 messages available [Expected result: 1].
 
-========== 5 ==========
+======== 5 ========
 Expected time: 5; Thread [3] attempting to receive message.
 
-========== 6 ==========
+======== 6 ========
 Expected time: 6; Thread [2] attempting to receive message.
 Expected time: 6; Thread [2] received message: '2. Hello world!'
 
-========== 7 ==========
+======== 7 ========
 Expected time: 7; Thread [2] attempting to receive message.
 
-========== 8 ==========
+======== 8 ========
 Expected time: 8; Thread [1] is attempting to add message '3. Hello world!' to the queue.
 Expected time: 8; Thread [1] successfully added message '3. Hello world!' to the queue.
-Expected time: 8; Thread [3] received message: '3. Hello world!'
 Expected time: 8; Thread [2] received message: '3. Hello world!'
+Expected time: 8; Thread [3] received message: '3. Hello world!'
 
-========== 9 ==========
+======== 9 ========
 
-========== 10 ==========
+======== 10 ========
 Expected time: 10; Thread [1] is changed size of queue to '2'.
 
-========== 11 ==========
+======== 11 ========
 Expected time: 11; Thread [1] is attempting to add message '4. Hello world!' to the queue.
 Expected time: 11; Thread [1] successfully added message '4. Hello world!' to the queue.
 
-========== 12 ==========
+======== 12 ========
 >> Expected time: 12; Thread [4] subscribed.
-Expected time: 12; Thread [3] has 1 messages available [Expected result: 1].
 Expected time: 12; Thread [2] has 1 messages available [Expected result: 1].
+Expected time: 12; Thread [3] has 1 messages available [Expected result: 1].
 
-========== 13 ==========
+======== 13 ========
 Expected time: 13; Thread [1] is attempting to add message '5. Hello world!' to the queue.
 Expected time: 13; Thread [1] successfully added message '5. Hello world!' to the queue.
 
-========== 14 ==========
+======== 14 ========
 Expected time: 14; Thread [4] has 1 messages available [Expected result: 1].
 Expected time: 14; Thread [2] has 2 messages available [Expected result: 2].
 Expected time: 14; Thread [3] has 2 messages available [Expected result: 2].
 Expected time: 14; Thread [1] is attempting to add message '6. Hello world!' to the queue.
 
-========== 15 ==========
->> Expected time: 15; Thread [4] unsubscribed.
->> Expected time: 15; Thread [4] ended.
+======== 15 ========
+>> Expected time: 15; Thread [4] unsubscribed аnd ended.
 
-========== 16 ==========
+======== 16 ========
 Expected time: 16; Thread [3] attempting to receive message.
 Expected time: 16; Thread [3] received message: '4. Hello world!'
 
-========== 17 ==========
+======== 17 ========
 Expected time: 17; Thread [2] attempting to receive message.
 Expected time: 17; Thread [2] received message: '4. Hello world!'
 Expected time: 17; Thread [1] successfully added message '6. Hello world!' to the queue.
 
-========== 18 ==========
->> Expected time: 18; Thread [3] unsubscribed.
->> Expected time: 18; Thread [3] ended.
+======== 18 ========
+>> Expected time: 18; Thread [3] unsubscribed аnd ended.
 
-========== 19 ==========
+======== 19 ========
 Expected time: 19; Thread [1] is attempting to add message '7. Hello world!' to the queue.
 
-========== 20 ==========
+======== 20 ========
 Expected time: 20; Thread [2] has 2 messages available [Expected result: 2].
 
-========== 21 ==========
+======== 21 ========
 Expected time: 21; Thread [2] attempting to receive message.
 Expected time: 21; Thread [2] received message: '5. Hello world!'
 Expected time: 21; Thread [1] successfully added message '7. Hello world!' to the queue.
->> Expected time: 21; Thread [1] ended.
 
-========== 22 ==========
+======== 22 ========
 Expected time: 22; Thread [2] attempting to receive message.
 Expected time: 22; Thread [2] received message: '6. Hello world!'
 
-========== 23 ==========
+======== 23 ========
 Expected time: 23; Thread [2] attempting to receive message.
 Expected time: 23; Thread [2] received message: '7. Hello world!'
->> Expected time: 23; Thread [2] unsubscribed.
->> Expected time: 23; Thread [2] ended.
+>> Expected time: 23; Thread [2] unsubscribed аnd ended.
+
+--------------------------------
+Process exited after 23.23 seconds with return value 0
+Press any key to continue . . .
 ```
