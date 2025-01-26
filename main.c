@@ -210,7 +210,7 @@ void single_thread_test()
 	printf("[Result: %d] Test x<0 in 'getAvailable' [Details: %d<%d]\n", (num < 0), num, 0);
 
 	// Test 'subscribe'
-	for (int i=100; i>=0; i--)
+	for (int i=1000; i>=0; i--)
 	{
 		subscribe(queue, thread_ID+i);
 	}
@@ -219,7 +219,7 @@ void single_thread_test()
 	p = getMsg(queue, thread_ID);
 	num = getAvailable(queue, thread_ID);
 	printf("[Result: %d] Test 'subscribe' [Details: %d=%d && %d=%d && %p=%p]\n", (num==1 && *m1==*p && m1==p), num, 1, *m1, *p, m1, p);
-	for (int i=0; i<=100; i++)
+	for (int i=0; i<=1000; i++)
 	{
 		unsubscribe(queue, thread_ID+i);
 	}
