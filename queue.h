@@ -10,13 +10,14 @@
 #include <pthread.h>
 
 struct TQueue {
-	pthread_t *subscribers;			// Tablica watkow subskrybujacych
-	void **messages;				// Tablica wskaznikow na wiadomosci
-	int *message_register;			// Tablica licznikow odczytanych wiadomosci dla watkow
+	int messages_size;				// Rozmiar tablicy przechowywanych wiadomosci
+	int messages_count;				// Aktualna liczba przechowywanych wiadomosci
+	int subscribers_size;			// Rozmiar tablicy watkow subskrybujacych
+	int subscribers_count;			// Aktualna liczba watkow subskrybujacych
 
-	int subscriber_count;			// Liczba subskrybentow
-	int message_count;				// Liczba przechowywanych wiadomosci
-	int size;						// Rozmiar kolejki
+	void **messages;				// Tablica przechowywanych wiadomosci
+	int *messages_register;			// Tablica licznikow odczytanych wiadomosci dla watkow
+	pthread_t *subscribers;			// Tablica watkow subskrybujacych
 
 	pthread_mutex_t lock;			// Mutex do synchronizacji
 	pthread_cond_t cond_not_full;	// Zmienna warunkowa dla niepelnej kolejki

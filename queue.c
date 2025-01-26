@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <unistd.h>
 #include "queue.h"
 
 TQueue* createQueue(int size)
@@ -12,13 +11,14 @@ TQueue* createQueue(int size)
 	// Tworzenie
 	TQueue *queue = (TQueue *)malloc(sizeof(TQueue));
 
-	queue->subscribers = NULL;
-	queue->messages = (void **)malloc(sizeof(void *) * size);
-	queue->message_register = NULL;
+	queue->messages_size = size;
+	queue->messages_count = 0;
+	queue->subscribers_size = 16;
+	queue->subscribers_count = 0;
 
-	queue->subscriber_count = 0;
-	queue->message_count = 0;
-	queue->size = size;
+	queue->messages = (void **)malloc(sizeof(void *) * queue->messages_size);
+	queue->messages_register = (int *)malloc(sizeof(int) * queue->subscribers_size);
+	queue->subscribers = (pthread_t *)malloc(sizeof(pthread_t) * queue->subscribers_size);
 
 	pthread_mutex_init(&queue->lock, NULL);
 	pthread_cond_init(&queue->cond_not_full, NULL);
@@ -33,9 +33,9 @@ void destroyQueue(TQueue *queue)
 	pthread_mutex_lock(&queue->lock);
 
 	// Niszczenie
-	free(queue->subscribers);
 	free(queue->messages);
-	free(queue->message_register);
+	free(queue->messages_register);
+	free(queue->subscribers);
 
 	pthread_cond_destroy(&queue->cond_not_full);
 	pthread_cond_destroy(&queue->cond_not_empty);
@@ -51,21 +51,20 @@ void subscribe(TQueue *queue, pthread_t thread)
 {
 	pthread_mutex_lock(&queue->lock);
 
-	// Realokacja pamieci
-	queue->subscriber_count++;
-	queue->subscribers = (pthread_t *)realloc(queue->subscribers, sizeof(pthread_t) * queue->subscriber_count);
-	queue->message_register = (int *)realloc(queue->message_register, sizeof(int) * queue->subscriber_count);
-	if (!queue->subscribers || !queue->message_register)
+	// Realokacja pamieci, jesli konieczna
+	queue->subscribers_count++;
+	if (queue->subscribers_size < queue->subscribers_count)
 	{
-		pthread_mutex_unlock(&queue->lock);
-		return;
+		queue->subscribers_size *= 2;
+		queue->messages_register = (int *)realloc(queue->messages_register, sizeof(int) * queue->subscribers_size);
+		queue->subscribers = (pthread_t *)realloc(queue->subscribers, sizeof(pthread_t) * queue->subscribers_size);
 	}
 
 	// Dodanie do listy subskrybentow
-	queue->subscribers[queue->subscriber_count - 1] = thread;
+	queue->subscribers[queue->subscribers_count - 1] = thread;
 
 	// Uznanie wczesniejszych wiadomosci za przeczytane
-	queue->message_register[queue->subscriber_count - 1] = queue->message_count;
+	queue->messages_register[queue->subscribers_count - 1] = queue->messages_count;
 
 	// Sukces
 	pthread_mutex_unlock(&queue->lock);
@@ -75,29 +74,33 @@ void unsubscribe(TQueue *queue, pthread_t thread)
 {
 	pthread_mutex_lock(&queue->lock);
 
-	for (int i=0; i<queue->subscriber_count; i++)
+	for (int i=0; i<queue->subscribers_count; i++)
 	{
 		if (pthread_equal(queue->subscribers[i], thread))
 		{
 			// Przesuniecie watkow
-			for (int j=i; j<queue->subscriber_count-1; j++)
+			for (int j=i; j<queue->subscribers_count-1; j++)
 			{
 				queue->subscribers[j] = queue->subscribers[j+1];
-				queue->message_register[j] = queue->message_register[j+1];
+				queue->messages_register[j] = queue->messages_register[j+1];
 			}
 
-			// Realokacja pamieci
-			queue->subscriber_count--;
-			queue->subscribers = (pthread_t *)realloc(queue->subscribers, sizeof(pthread_t) * queue->subscriber_count);
-			queue->message_register = (int *)realloc(queue->message_register, sizeof(int) * queue->subscriber_count);
+			// Realokacja pamieci, jesli konieczna
+			queue->subscribers_count--;
+			if (queue->subscribers_size > 16 && queue->subscribers_size/10 > queue->subscribers_count)
+			{
+				queue->subscribers_size /= 2;
+				queue->messages_register = (int *)realloc(queue->messages_register, sizeof(int) * queue->subscribers_size);
+				queue->subscribers = (pthread_t *)realloc(queue->subscribers, sizeof(pthread_t) * queue->subscribers_size);
+			}
 
 			// Jesli najstarsza wiadomosc zostala odczytana przez wszystkie watki
 			int all_read = 1;
-			while (queue->message_count > 0 && all_read == 1)
+			while (queue->messages_count > 0 && all_read == 1)
 			{
-				for (int i=0; i<queue->subscriber_count; i++)
+				for (int i=0; i<queue->subscribers_count; i++)
 				{
-					if (queue->message_register[i] <= 0)
+					if (queue->messages_register[i] <= 0)
 					{
 						all_read = 0;
 						break;
@@ -106,16 +109,16 @@ void unsubscribe(TQueue *queue, pthread_t thread)
 				if (all_read == 1) // Usun najstarsza wiadomosc
 				{
 					// Przesuniece wiadomosci
-					for (int i=0; i<queue->message_count-1; i++)
+					for (int i=0; i<queue->messages_count-1; i++)
 					{
 						queue->messages[i] = queue->messages[i+1];
 					}
 
 					// Dostosuj liczniki wiadomosci dla subskrybentow
-					queue->message_count--;
-					for (int i=0; i<queue->subscriber_count; i++)
+					queue->messages_count--;
+					for (int i=0; i<queue->subscribers_count; i++)
 					{
-						queue->message_register[i]--;
+						queue->messages_register[i]--;
 					}
 
 					// Obudz czekajacych na dodanie nowych wiadomosci
@@ -138,21 +141,21 @@ void addMsg(TQueue *queue, void *msg)
 	pthread_mutex_lock(&queue->lock);
 
 	// Jesli nie ma subskrybentow
-	if (queue->subscriber_count <= 0)
+	if (queue->subscribers_count <= 0)
 	{
 		pthread_mutex_unlock(&queue->lock);
 		return;
 	}
 
 	// Czekaj jesli kolejka jest pelna
-	while (queue->message_count >= queue->size)
+	while (queue->messages_count >= queue->messages_size)
 	{
 		pthread_cond_wait(&queue->cond_not_full, &queue->lock);
 	}
 
 	// Dodaj wiadomosc
-	queue->messages[queue->message_count] = msg;
-	queue->message_count++;
+	queue->messages[queue->messages_count] = msg;
+	queue->messages_count++;
 
 	// Obudz czekajacych na odczytanie nowych wiadomosci
 	pthread_cond_broadcast(&queue->cond_not_empty);
@@ -167,7 +170,7 @@ void* getMsg(TQueue *queue, pthread_t thread)
 
 	// Znajdz subskrybenta
 	int subscriber_index = -1;
-	for (int i=0; i<queue->subscriber_count; i++)
+	for (int i=0; i<queue->subscribers_count; i++)
 	{
 		if (pthread_equal(queue->subscribers[i], thread))
 		{
@@ -182,22 +185,22 @@ void* getMsg(TQueue *queue, pthread_t thread)
 	}
 
 	// Czekaj jesli nie ma nowych wiadomosci
-	while (queue->message_register[subscriber_index] >= queue->message_count)
+	while (queue->messages_register[subscriber_index] >= queue->messages_count)
 	{
 		pthread_cond_wait(&queue->cond_not_empty, &queue->lock);
 	}
 
 	// Pobierz wiadomosc
-	void *msg = queue->messages[queue->message_register[subscriber_index]];
-	queue->message_register[subscriber_index]++;
+	void *msg = queue->messages[queue->messages_register[subscriber_index]];
+	queue->messages_register[subscriber_index]++;
 
 	// Jesli najstarsza wiadomosc zostala odczytana przez wszystkie watki
 	int all_read = 1;
-	while (queue->message_count > 0 && all_read == 1)
+	while (queue->messages_count > 0 && all_read == 1)
 	{
-		for (int i=0; i<queue->subscriber_count; i++)
+		for (int i=0; i<queue->subscribers_count; i++)
 		{
-			if (queue->message_register[i] <= 0)
+			if (queue->messages_register[i] <= 0)
 			{
 				all_read = 0;
 				break;
@@ -206,16 +209,16 @@ void* getMsg(TQueue *queue, pthread_t thread)
 		if (all_read == 1) // Usun najstarsza wiadomosc
 		{
 			// Przesuniece wiadomosci
-			for (int i=0; i<queue->message_count-1; i++)
+			for (int i=0; i<queue->messages_count-1; i++)
 			{
 				queue->messages[i] = queue->messages[i+1];
 			}
 
 			// Dostosuj liczniki wiadomosci dla subskrybentow
-			queue->message_count--;
-			for (int i=0; i<queue->subscriber_count; i++)
+			queue->messages_count--;
+			for (int i=0; i<queue->subscribers_count; i++)
 			{
-				queue->message_register[i]--;
+				queue->messages_register[i]--;
 			}
 
 			// Obudz czekajacych na dodanie nowych wiadomosci
@@ -234,7 +237,7 @@ int getAvailable(TQueue *queue, pthread_t thread)
 
 	// Znajdz subskrybenta
 	int subscriber_index = -1;
-	for (int i=0; i<queue->subscriber_count; i++)
+	for (int i=0; i<queue->subscribers_count; i++)
 	{
 		if (pthread_equal(queue->subscribers[i], thread))
 		{
@@ -249,7 +252,7 @@ int getAvailable(TQueue *queue, pthread_t thread)
 	}
 
 	// Pobierz wartosc
-	int result = queue->message_count - queue->message_register[subscriber_index];
+	int result = queue->messages_count - queue->messages_register[subscriber_index];
 
 	// Sukces
 	pthread_mutex_unlock(&queue->lock);
@@ -262,7 +265,7 @@ void removeMsg(TQueue *queue, void *msg)
 
 	// Znajdz wiadomosc w kolejce
 	int found = -1;
-	for (int i=0; i<queue->message_count; i++)
+	for (int i=0; i<queue->messages_count; i++)
 	{
 		if (queue->messages[i] == msg)
 		{
@@ -277,18 +280,18 @@ void removeMsg(TQueue *queue, void *msg)
 	}
 
 	// Przesuniece wiadomosci
-	for (int i=found; i<queue->message_count-1; i++)
+	for (int i=found; i<queue->messages_count-1; i++)
 	{
 		queue->messages[i] = queue->messages[i+1];
 	}
 
 	// Dostosuj liczniki wiadomosci dla subskrybentow
-	queue->message_count--;
-	for (int i=0; i<queue->subscriber_count; i++)
+	queue->messages_count--;
+	for (int i=0; i<queue->subscribers_count; i++)
 	{
-		if (queue->message_register[i] > found)
+		if (queue->messages_register[i] > found)
 		{
-			queue->message_register[i]--;
+			queue->messages_register[i]--;
 		}
 	}
 
@@ -310,26 +313,26 @@ void setSize(TQueue *queue, int size)
 	}
 
 	// Jesli nowy rozmiar jest mniejszy niz ilosc wiadomosci
-	if (size < queue->message_count)
+	if (size < queue->messages_count)
 	{
-		int diff = queue->message_count - size;
+		int diff = queue->messages_count - size;
 
 		// Przesun wiadomosci pozostajace w kolejce
-		for (int i=diff; i<queue->message_count; i++)
+		for (int i=diff; i<queue->messages_count; i++)
 		{
 			queue->messages[i-diff] = queue->messages[i];
 		}
 
 		// Dostosuj liczniki odczytanych wiadomosci dla watkow
-		for (int i=0; i<queue->subscriber_count; i++)
+		for (int i=0; i<queue->subscribers_count; i++)
 		{
-			if (queue->message_register[i] - diff > 0)
-				queue->message_register[i] -= diff;
+			if (queue->messages_register[i] - diff > 0)
+				queue->messages_register[i] -= diff;
 			else
-				queue->message_register[i] = 0;
+				queue->messages_register[i] = 0;
 		}
 
-		queue->message_count = size;
+		queue->messages_count = size;
 	}
 
 	// Realokacja pamieci
@@ -341,10 +344,10 @@ void setSize(TQueue *queue, int size)
 	}
 
 	// Ustaw rozmiar
-	queue->size = size;
+	queue->messages_size = size;
 
 	// Jesli w kolejce sa wolne miejsca na wiadomosci
-	if (queue->size > queue->message_count)
+	if (queue->messages_size > queue->messages_count)
 		pthread_cond_broadcast(&queue->cond_not_full);
 
 	// Sukces

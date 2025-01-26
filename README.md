@@ -18,13 +18,14 @@ dostęp do potrzebnych zasobów, a przy wywoływaniu funkcji wystarczy podać ws
 
 ```C
 struct TQueue {
-	pthread_t *subscribers;		// Tablica watkow subskrybujacych
-	void **messages;		// Tablica wskaznikow na wiadomosci
-	int *message_register;		// Tablica licznikow odczytanych wiadomosci dla watkow
+	int messages_size;		// Rozmiar tablicy przechowywanych wiadomosci
+	int messages_count;		// Aktualna liczba przechowywanych wiadomosci
+	int subscribers_size;		// Rozmiar tablicy watkow subskrybujacych
+	int subscribers_count;		// Aktualna liczba watkow subskrybujacych
 
-	int subscriber_count;		// Liczba subskrybentow
-	int message_count;		// Liczba przechowywanych wiadomosci
-	int size;			// Rozmiar kolejki
+	void **messages;		// Tablica przechowywanych wiadomosci
+	int *messages_register;		// Tablica licznikow odczytanych wiadomosci dla watkow
+	pthread_t *subscribers;		// Tablica watkow subskrybujacych
 
 	pthread_mutex_t lock;		// Mutex do synchronizacji
 	pthread_cond_t cond_not_full;	// Zmienna warunkowa dla niepelnej kolejki
@@ -110,7 +111,7 @@ Faza	Wątek T₁	Wątek T₂	Wątek T₃	Wątek T₄
 
 ```PHP
 ========== MULTI THREAD TEST ==========
-Queue created with size 1
+Queue created with size '1'
 
 ======== 1 ========
 Expected time: 1; Thread [1] is attempting to add message '1. Hello world!' to the queue.
@@ -125,14 +126,14 @@ Expected time: 3; Thread [1] successfully added message '2. Hello world!' to the
 
 ======== 4 ========
 >> Expected time: 4; Thread [3] subscribed.
-Expected time: 4; Thread [2] has 1 messages available [Expected result: 1].
+Expected time: 4; Thread [2] has '1' messages available [Expected result: 1].
 
 ======== 5 ========
 Expected time: 5; Thread [3] attempting to receive message.
 
 ======== 6 ========
 Expected time: 6; Thread [2] attempting to receive message.
-Expected time: 6; Thread [2] received message: '2. Hello world!'
+Expected time: 6; Thread [2] received message: '2. Hello world!'.
 
 ======== 7 ========
 Expected time: 7; Thread [2] attempting to receive message.
@@ -140,13 +141,13 @@ Expected time: 7; Thread [2] attempting to receive message.
 ======== 8 ========
 Expected time: 8; Thread [1] is attempting to add message '3. Hello world!' to the queue.
 Expected time: 8; Thread [1] successfully added message '3. Hello world!' to the queue.
-Expected time: 8; Thread [2] received message: '3. Hello world!'
-Expected time: 8; Thread [3] received message: '3. Hello world!'
+Expected time: 8; Thread [2] received message: '3. Hello world!'.
+Expected time: 8; Thread [3] received message: '3. Hello world!'.
 
 ======== 9 ========
 
 ======== 10 ========
-Expected time: 10; Thread [1] is changed size of queue to '2'.
+Expected time: 10; Thread [1] changed size of queue to '2'.
 
 ======== 11 ========
 Expected time: 11; Thread [1] is attempting to add message '4. Hello world!' to the queue.
@@ -154,55 +155,55 @@ Expected time: 11; Thread [1] successfully added message '4. Hello world!' to th
 
 ======== 12 ========
 >> Expected time: 12; Thread [4] subscribed.
-Expected time: 12; Thread [2] has 1 messages available [Expected result: 1].
-Expected time: 12; Thread [3] has 1 messages available [Expected result: 1].
+Expected time: 12; Thread [2] has '1' messages available [Expected result: 1].
+Expected time: 12; Thread [3] has '1' messages available [Expected result: 1].
 
 ======== 13 ========
 Expected time: 13; Thread [1] is attempting to add message '5. Hello world!' to the queue.
 Expected time: 13; Thread [1] successfully added message '5. Hello world!' to the queue.
 
 ======== 14 ========
-Expected time: 14; Thread [4] has 1 messages available [Expected result: 1].
-Expected time: 14; Thread [2] has 2 messages available [Expected result: 2].
-Expected time: 14; Thread [3] has 2 messages available [Expected result: 2].
+Expected time: 14; Thread [4] has '1' messages available [Expected result: 1].
+Expected time: 14; Thread [2] has '2' messages available [Expected result: 2].
+Expected time: 14; Thread [3] has '2' messages available [Expected result: 2].
 Expected time: 14; Thread [1] is attempting to add message '6. Hello world!' to the queue.
 
 ======== 15 ========
->> Expected time: 15; Thread [4] unsubscribed аnd ended.
+>> Expected time: 15; Thread [4] unsubscribed and ended.
 
 ======== 16 ========
 Expected time: 16; Thread [3] attempting to receive message.
-Expected time: 16; Thread [3] received message: '4. Hello world!'
+Expected time: 16; Thread [3] received message: '4. Hello world!'.
 
 ======== 17 ========
 Expected time: 17; Thread [2] attempting to receive message.
-Expected time: 17; Thread [2] received message: '4. Hello world!'
+Expected time: 17; Thread [2] received message: '4. Hello world!'.
 Expected time: 17; Thread [1] successfully added message '6. Hello world!' to the queue.
 
 ======== 18 ========
->> Expected time: 18; Thread [3] unsubscribed аnd ended.
+>> Expected time: 18; Thread [3] unsubscribed and ended.
 
 ======== 19 ========
 Expected time: 19; Thread [1] is attempting to add message '7. Hello world!' to the queue.
 
 ======== 20 ========
-Expected time: 20; Thread [2] has 2 messages available [Expected result: 2].
+Expected time: 20; Thread [2] has '2' messages available [Expected result: 2].
 
 ======== 21 ========
 Expected time: 21; Thread [2] attempting to receive message.
-Expected time: 21; Thread [2] received message: '5. Hello world!'
+Expected time: 21; Thread [2] received message: '5. Hello world!'.
 Expected time: 21; Thread [1] successfully added message '7. Hello world!' to the queue.
 
 ======== 22 ========
 Expected time: 22; Thread [2] attempting to receive message.
-Expected time: 22; Thread [2] received message: '6. Hello world!'
+Expected time: 22; Thread [2] received message: '6. Hello world!'.
 
 ======== 23 ========
 Expected time: 23; Thread [2] attempting to receive message.
-Expected time: 23; Thread [2] received message: '7. Hello world!'
->> Expected time: 23; Thread [2] unsubscribed аnd ended.
+Expected time: 23; Thread [2] received message: '7. Hello world!'.
+>> Expected time: 23; Thread [2] unsubscribed and ended.
 
 --------------------------------
-Process exited after 23.23 seconds with return value 0
+Process exited after 23.47 seconds with return value 0
 Press any key to continue . . .
 ```
