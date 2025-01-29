@@ -5,6 +5,163 @@
 #include <string.h>
 #include "queue.h"
 
+void single_thread_test()
+{
+	const pthread_t thread_ID = 1337;
+	const int QUEUE_SIZE = 6;
+
+	// Tworzenie kolejki
+	TQueue *queue;
+	queue = createQueue(QUEUE_SIZE);
+	printf("Queue created with size '%d'\n", QUEUE_SIZE);
+
+	// Deklaracja zmiennych
+	int *m1, *m2, *m3, *p, num;
+	m1 = malloc(sizeof(int)); m2 = malloc(sizeof(int)); m3 = malloc(sizeof(int));
+	*m1 = 10; *m2 = 20; *m3 = 30;
+
+	// Test wskaznikow
+	subscribe(queue, thread_ID);
+	addMsg(queue, m1);
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test pointers [Details: %d=%d && %p=%p]\n", (*m1 == *p && m1 == p), *m1, *p, m1, p);
+
+	// Test usuwania wiadomosci
+	num = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test message removal [Details: %d=%d]\n", (num == 0), num, 0);
+	unsubscribe(queue, thread_ID);
+
+	// Test NULL w 'getMsg' i x<0 w 'getAvailable'
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test NULL in 'getMsg' [Details: %p=%p]\n", (p == NULL), p, NULL);
+	num = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test x<0 in 'getAvailable' [Details: %d<%d]\n", (num < 0), num, 0);
+
+	// Test 'subscribe'
+	for (int i=10000; i>=0; i--)
+	{
+		subscribe(queue, thread_ID+i);
+	}
+	addMsg(queue, m1);
+	addMsg(queue, m2);
+	p = getMsg(queue, thread_ID);
+	num = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test 'subscribe' [Details: %d=%d && %d=%d && %p=%p]\n", (num == 1 && *m1 == *p && m1 == p), num, 1, *m1, *p, m1, p);
+	for (int i=0; i<=10000; i++)
+	{
+		unsubscribe(queue, thread_ID+i);
+	}
+
+	// Test 'unsubscribe'
+	subscribe(queue, thread_ID);
+	addMsg(queue, m1);
+	addMsg(queue, m2);
+	addMsg(queue, m3);
+	addMsg(queue, m1);
+	unsubscribe(queue, thread_ID);
+	subscribe(queue, thread_ID);
+	addMsg(queue, m2);
+	addMsg(queue, m3);
+	num = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test 'unsubscribe' [Details: %d=%d]\n", (num == 2), num, 2);
+	unsubscribe(queue, thread_ID);
+
+	// Test 'addMsg'
+	subscribe(queue, thread_ID);
+	setSize(queue, 10002);
+	addMsg(queue, m1);
+	addMsg(queue, m2);
+	for (int i=0; i<10000; i++)
+	{
+		addMsg(queue, m1);
+	}
+	p = getMsg(queue, thread_ID);
+	p = getMsg(queue, thread_ID);
+	num = getAvailable(queue, thread_ID);
+	printf("[Result: %d] Test 'addMsg' [Details: %d=%d && %d=%d && %p=%p]\n", (num == 10000 && *m2 == *p && m2 == p), num, 10000, *m2, *p, m2, p);
+	setSize(queue, QUEUE_SIZE);
+	unsubscribe(queue, thread_ID);
+
+	// Test 'removeMsg'
+	subscribe(queue, thread_ID);
+	addMsg(queue, m1);
+	addMsg(queue, m2);
+	removeMsg(queue, m1);
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test 'removeMsg' [Details: %d=%d && %p=%p]\n", (*m2 == *p && m2 == p), *m2, *p, m2, p);
+	unsubscribe(queue, thread_ID);
+
+	// Test 'setSize'
+	subscribe(queue, thread_ID);
+	addMsg(queue, m1);
+	addMsg(queue, m2);
+	addMsg(queue, m3);
+	addMsg(queue, m1);
+	addMsg(queue, m1);
+	addMsg(queue, m1);
+	setSize(queue, 4);
+	p = getMsg(queue, thread_ID);
+	printf("[Result: %d] Test 'setSize' [Details: %d=%d && %p=%p]\n", (*m3 == *p && m3 == p), *m3, *p, m3, p);
+	unsubscribe(queue, thread_ID);
+
+	// Test 'destroyQueue'
+	destroyQueue(queue);
+	printf("[Result: 1] Test 'destroyQueue'\n");
+
+	// Zwolnienie pamieci
+	free(m1); free(m2); free(m3);
+}
+
+
+
+void* thread_func_add(void *arg)
+{
+	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
+	int *msg = NULL; // Wskaznik do wiadomosci
+	int x = 0; // Wartosc wiadomosci
+
+	while (1)
+	{
+		usleep(50);
+		x++;
+
+		msg = malloc(sizeof(int));
+		*msg = x;
+		addMsg(queue, msg);
+	}
+
+	return NULL;
+}
+
+void* thread_func_read(void *arg)
+{
+	pthread_t thread_ID = pthread_self(); // ID watku
+	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
+	int *msg = NULL, *p = NULL; // Wskaznik do wiadomosci
+
+	subscribe(queue, thread_ID);
+	p = getMsg(queue, thread_ID);
+
+	for (int i=0; i<20; i++)
+	{
+		msg = getMsg(queue, thread_ID);
+
+		if (*msg-1 != *p)
+		{
+			printf("[Result: 0] Test brute force [Details: %d-1 != %d]\n", *msg, *p);
+		}
+
+		free(p);
+		p = msg;
+	}
+
+	unsubscribe(queue, thread_ID);
+
+	return NULL;
+}
+
+
+
 void* timer(void *arg)
 {
 	usleep(500000); // 0.5 sekundy
@@ -20,7 +177,7 @@ void* timer(void *arg)
 
 void* thread_func_1(void *arg)
 {
-	pthread_t thread_ID = pthread_self(); // ID watku
+	pthread_t thread_ID = 1; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 	void *msg1, *msg2, *msg3, *msg4, *msg5, *msg6, *msg7; // Wskazniki do wiadomosci
 
@@ -78,7 +235,7 @@ void* thread_func_1(void *arg)
 
 void* thread_func_2(void *arg)
 {
-	pthread_t thread_ID = pthread_self(); // ID watku
+	pthread_t thread_ID = 2; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 
 	sleep(2); // 0 -> 2
@@ -130,7 +287,7 @@ void* thread_func_2(void *arg)
 
 void* thread_func_3(void *arg)
 {
-	pthread_t thread_ID = pthread_self(); // ID watku
+	pthread_t thread_ID = 3; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 
 	sleep(4); // 0 -> 4
@@ -160,7 +317,7 @@ void* thread_func_3(void *arg)
 
 void* thread_func_4(void *arg)
 {
-	pthread_t thread_ID = pthread_self(); // ID watku
+	pthread_t thread_ID = 4; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 
 	sleep(12); // 0 -> 12
@@ -177,135 +334,90 @@ void* thread_func_4(void *arg)
 	return NULL;
 }
 
-void single_thread_test()
-{
-	pthread_t thread_ID=1000;
-	const int QUEUE_SIZE=6;
-
-	// Tworzenie kolejki
-	TQueue *queue;
-	queue = createQueue(QUEUE_SIZE);
-	printf("Queue created with size '%d'\n", QUEUE_SIZE);
-
-	// Deklaracja zmiennych
-	int *m1, *m2, *m3, *p, num;
-	m1 = malloc(sizeof(int)); m2 = malloc(sizeof(int)); m3 = malloc(sizeof(int));
-	*m1 = 10; *m2 = 20; *m3 = 30;
-
-	// Test wskaznikow
-	subscribe(queue, thread_ID);
-	addMsg(queue, m1);
-	p = getMsg(queue, thread_ID);
-	printf("[Result: %d] Test pointers [Details: %d=%d && %p=%p]\n", (*m1==*p && m1==p), *m1, *p, m1, p);
-
-	// Test usuwania wiadomosci
-	num = getAvailable(queue, thread_ID);
-	printf("[Result: %d] Test message removal [Details: %d=%d]\n", (num == 0), num, 0);
-	unsubscribe(queue, thread_ID);
-
-	// Test NULL w 'getMsg' i x<0 w 'getAvailable'
-	p = getMsg(queue, thread_ID);
-	printf("[Result: %d] Test NULL in 'getMsg' [Details: %p=%p]\n", (p==NULL), p, NULL);
-	num = getAvailable(queue, thread_ID);
-	printf("[Result: %d] Test x<0 in 'getAvailable' [Details: %d<%d]\n", (num < 0), num, 0);
-
-	// Test 'subscribe'
-	for (int i=1000; i>=0; i--)
-	{
-		subscribe(queue, thread_ID+i);
-	}
-	addMsg(queue, m1);
-	addMsg(queue, m2);
-	p = getMsg(queue, thread_ID);
-	num = getAvailable(queue, thread_ID);
-	printf("[Result: %d] Test 'subscribe' [Details: %d=%d && %d=%d && %p=%p]\n", (num==1 && *m1==*p && m1==p), num, 1, *m1, *p, m1, p);
-	for (int i=0; i<=1000; i++)
-	{
-		unsubscribe(queue, thread_ID+i);
-	}
-
-	// Test 'unsubscribe'
-	subscribe(queue, thread_ID);
-	addMsg(queue, m1);
-	addMsg(queue, m2);
-	addMsg(queue, m3);
-	addMsg(queue, m1);
-	unsubscribe(queue, thread_ID);
-	subscribe(queue, thread_ID);
-	addMsg(queue, m2);
-	addMsg(queue, m3);
-	num = getAvailable(queue, thread_ID);
-	printf("[Result: %d] Test 'unsubscribe' [Details: %d=%d]\n", (num == 2), num, 2);
-	unsubscribe(queue, thread_ID);
-
-	// Test 'removeMsg'
-	subscribe(queue, thread_ID);
-	addMsg(queue, m1);
-	addMsg(queue, m2);
-	removeMsg(queue, m1);
-	p = getMsg(queue, thread_ID);
-	printf("[Result: %d] Test 'removeMsg' [Details: %d=%d && %p=%p]\n", (*m2==*p && m2==p), *m2, *p, m2, p);
-	unsubscribe(queue, thread_ID);
-
-	// Test 'setSize'
-	subscribe(queue, thread_ID);
-	addMsg(queue, m1);
-	addMsg(queue, m2);
-	addMsg(queue, m3);
-	addMsg(queue, m1);
-	addMsg(queue, m1);
-	addMsg(queue, m1);
-	setSize(queue, 4);
-	p = getMsg(queue, thread_ID);
-	printf("[Result: %d] Test 'setSize' [Details: %d=%d && %p=%p]\n", (*m3==*p && m3==p), *m3, *p, m3, p);
-	unsubscribe(queue, thread_ID);
-
-	// Test 'destroyQueue'
-	destroyQueue(queue);
-	printf("[Result: 1] Test 'destroyQueue'\n\n");
-
-	// Zwolnienie pamieci
-	free(m1); free(m2); free(m3);
-}
-
 
 
 int main()
 {
-	// Testy na pojedynczym watku
-	printf("========== SINGLE THREAD TEST ==========\n");
-	single_thread_test();
+	const int DO_TEST_SINGLE = 1;
+	const int DO_TEST_BRUTE = 1;
+	const int DO_TEST_MULTI = 1;
 
-	// Testy na wielu watkach
-	printf("========== MULTI THREAD TEST ==========\n");
-	const int THREADS_NUM=5, QUEUE_SIZE=1;
-	pthread_t threads[THREADS_NUM];
-
-	// Tworzenie kolejki
-	TQueue *queue;
-	queue = createQueue(QUEUE_SIZE);
-	printf("Queue created with size '%d'\n", QUEUE_SIZE);
-
-	// Tworzenie watkow
-	pthread_create(&threads[0], NULL, thread_func_1, queue);
-	pthread_create(&threads[1], NULL, thread_func_2, queue);
-	pthread_create(&threads[2], NULL, thread_func_3, queue);
-	pthread_create(&threads[3], NULL, thread_func_4, queue);
-
-	// Tworzenie timera
-	pthread_create(&threads[4], NULL, timer, NULL);
-
-	// Czekanie na zakonczenie watkow
-	for (int i=0; i<THREADS_NUM-1; i++)
+	if (DO_TEST_SINGLE)
 	{
-		pthread_join(threads[i], NULL);
+		// Testy na pojedynczym watku
+		printf("========== SINGLE THREAD TEST ==========\n");
+		single_thread_test();
+		printf("END\n\n");
 	}
 
-	// Zakonczenie timera
-	pthread_cancel(threads[4]);
+	if (DO_TEST_BRUTE)
+	{
+		// Testy na wielu watkach
+		printf("========== BRUTE FORCE TEST ==========\n");
+		const int THREADS_NUM=200, QUEUE_SIZE=1000;
+		pthread_t threads[THREADS_NUM];
 
-	// Zniszczenie kolejki
-	destroyQueue(queue);
+		// Tworzenie kolejki
+		TQueue *queue;
+		queue = createQueue(QUEUE_SIZE);
+		printf("Queue created with size '%d'\n", QUEUE_SIZE);
+
+		// Tworzenie watkow
+		pthread_create(&threads[0], NULL, thread_func_add, queue);
+		for (int i=1; i<THREADS_NUM; i++)
+		{
+			pthread_create(&threads[i], NULL, thread_func_read, queue);
+			usleep(5000); // Dodanie 20 wiadomosci zajmie okolo 50*20 = 1000ms
+		}
+
+		// Czekanie na zakonczenie watkow
+		for (int i=1; i<THREADS_NUM; i++)
+		{
+			pthread_join(threads[i], NULL);
+		}
+
+		// Zakonczenie dodawania
+		pthread_cancel(threads[0]);
+
+		// Zniszczenie kolejki
+		destroyQueue(queue);
+		printf("END\n\n");
+	}
+
+	if (DO_TEST_MULTI)
+	{
+		// Testy na wielu watkach
+		printf("========== MULTI THREAD TEST ==========\n");
+		const int THREADS_NUM=5, QUEUE_SIZE=1;
+		pthread_t threads[THREADS_NUM];
+
+		// Tworzenie kolejki
+		TQueue *queue;
+		queue = createQueue(QUEUE_SIZE);
+		printf("Queue created with size '%d'\n", QUEUE_SIZE);
+
+		// Tworzenie watkow
+		pthread_create(&threads[0], NULL, thread_func_1, queue);
+		pthread_create(&threads[1], NULL, thread_func_2, queue);
+		pthread_create(&threads[2], NULL, thread_func_3, queue);
+		pthread_create(&threads[3], NULL, thread_func_4, queue);
+
+		// Tworzenie timera
+		pthread_create(&threads[4], NULL, timer, NULL);
+
+		// Czekanie na zakonczenie watkow
+		for (int i=0; i<THREADS_NUM-1; i++)
+		{
+			pthread_join(threads[i], NULL);
+		}
+
+		// Zakonczenie timera
+		pthread_cancel(threads[4]);
+
+		// Zniszczenie kolejki
+		destroyQueue(queue);
+		printf("END\n");
+	}
 
 	return 0;
 }

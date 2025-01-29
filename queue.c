@@ -33,6 +33,11 @@ void destroyQueue(TQueue *queue)
 	pthread_mutex_lock(&queue->lock);
 
 	// Niszczenie
+	for (int i=0; i<queue->messages_count; i++)
+	{
+		free(queue->messages[i]);
+	}
+
 	free(queue->messages);
 	free(queue->messages_register);
 	free(queue->subscribers);

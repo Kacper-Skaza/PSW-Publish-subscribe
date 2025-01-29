@@ -1,6 +1,6 @@
 <h1 align="center">Publish-subscribe (20 pkt)</h1>
 <h3 align="center">Programowanie systemowe i współbieżne <br> Kacper Skaza 160 174</h3>
-<h4 align="center">&lt;kacper.skaza@student.put.poznan.pl&gt; <br> v1.2, 2025-01-26</h4>
+<h4 align="center">&lt;kacper.skaza@student.put.poznan.pl&gt; <br> v1.3, 2025-01-29</h4>
 
 
 
@@ -164,8 +164,8 @@ Expected time: 13; Thread [1] successfully added message '5. Hello world!' to th
 
 ======== 14 ========
 Expected time: 14; Thread [4] has '1' messages available [Expected result: 1].
-Expected time: 14; Thread [2] has '2' messages available [Expected result: 2].
 Expected time: 14; Thread [3] has '2' messages available [Expected result: 2].
+Expected time: 14; Thread [2] has '2' messages available [Expected result: 2].
 Expected time: 14; Thread [1] is attempting to add message '6. Hello world!' to the queue.
 
 ======== 15 ========
@@ -202,8 +202,9 @@ Expected time: 22; Thread [2] received message: '6. Hello world!'.
 Expected time: 23; Thread [2] attempting to receive message.
 Expected time: 23; Thread [2] received message: '7. Hello world!'.
 >> Expected time: 23; Thread [2] unsubscribed аnd ended.
+END
 
 --------------------------------
-Process exited after 23.47 seconds with return value 0
+Process exited after 26.64 seconds with return value 0
 Press any key to continue . . .
 ```
