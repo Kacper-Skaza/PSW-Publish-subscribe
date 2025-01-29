@@ -155,8 +155,8 @@ Expected time: 11; Thread [1] successfully added message '4. Hello world!' to th
 
 ======== 12 ========
 >> Expected time: 12; Thread [4] subscribed.
-Expected time: 12; Thread [2] has '1' messages available [Expected result: 1].
 Expected time: 12; Thread [3] has '1' messages available [Expected result: 1].
+Expected time: 12; Thread [2] has '1' messages available [Expected result: 1].
 
 ======== 13 ========
 Expected time: 13; Thread [1] is attempting to add message '5. Hello world!' to the queue.
@@ -205,6 +205,6 @@ Expected time: 23; Thread [2] received message: '7. Hello world!'.
 END
 
 --------------------------------
-Process exited after 26.64 seconds with return value 0
+Process exited after 25.55 seconds with rеturn value 0
 Press any key to continue . . .
 ```

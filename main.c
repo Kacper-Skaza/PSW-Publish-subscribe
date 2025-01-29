@@ -127,6 +127,8 @@ void* thread_func_add(void *arg)
 
 		msg = malloc(sizeof(int));
 		*msg = x;
+
+		pthread_testcancel();
 		addMsg(queue, msg);
 	}
 
@@ -148,10 +150,9 @@ void* thread_func_read(void *arg)
 
 		if (*msg-1 != *p)
 		{
-			printf("[Result: 0] Test brute force [Details: %d-1 != %d]\n", *msg, *p);
+			printf("[Result: %d] Test brute force [Thread %lu][Details: %d-1 != %d]\n", (*msg-1 == *p), (unsigned long)thread_ID, *msg, *p);
 		}
 
-		free(p);
 		p = msg;
 	}
 
@@ -168,6 +169,7 @@ void* timer(void *arg)
 
 	for (int i=1; i<=30; i++)
 	{
+		pthread_testcancel();
 		printf("\n======== %d ========\n", i);
 		sleep(1);
 	}
@@ -354,7 +356,9 @@ int main()
 	{
 		// Testy na wielu watkach
 		printf("========== BRUTE FORCE TEST ==========\n");
-		const int THREADS_NUM=200, QUEUE_SIZE=1000;
+		const int THREADS_INTERVAL=200; // Odstep czasowy miedzy watkami (200ms)
+		const int THREADS_NUM=10000; // Liczba watkow (10000*200 = 2000000ms = 2s)
+		const int QUEUE_SIZE=1000; // Rozmiar kolejki
 		pthread_t threads[THREADS_NUM];
 
 		// Tworzenie kolejki
@@ -367,7 +371,7 @@ int main()
 		for (int i=1; i<THREADS_NUM; i++)
 		{
 			pthread_create(&threads[i], NULL, thread_func_read, queue);
-			usleep(5000); // Dodanie 20 wiadomosci zajmie okolo 50*20 = 1000ms
+			usleep(THREADS_INTERVAL); // Dodanie 20 wiadomosci zajmie okolo 50*20 = 1000ms
 		}
 
 		// Czekanie na zakonczenie watkow
@@ -388,7 +392,8 @@ int main()
 	{
 		// Testy na wielu watkach
 		printf("========== MULTI THREAD TEST ==========\n");
-		const int THREADS_NUM=5, QUEUE_SIZE=1;
+		const int THREADS_NUM=5; // Liczba watkow
+		const int QUEUE_SIZE=1; // Rozmiar kolejki
 		pthread_t threads[THREADS_NUM];
 
 		// Tworzenie kolejki
