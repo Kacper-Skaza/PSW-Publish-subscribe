@@ -193,22 +193,22 @@ void* getMsg(TQueue *queue, pthread_t thread)
 	while (queue->messages_register[subscriber_index] >= queue->messages_count)
 	{
 		pthread_cond_wait(&queue->cond_not_empty, &queue->lock);
-	}
 
-	// Znajdz subskrybenta (index mogl ulec zmianie badz watek mogl odsubskrybowac)
-	subscriber_index = -1;
-	for (int i=0; i<queue->subscribers_count; i++)
-	{
-		if (pthread_equal(queue->subscribers[i], thread))
+		// Znajdz subskrybenta (index mogl ulec zmianie badz watek mogl odsubskrybowac)
+		subscriber_index = -1;
+		for (int i=0; i<queue->subscribers_count; i++)
 		{
-			subscriber_index = i;
-			break;
+			if (pthread_equal(queue->subscribers[i], thread))
+			{
+				subscriber_index = i;
+				break;
+			}
 		}
-	}
-	if (subscriber_index == -1) // Watek nie jest subskrybentem
-	{
-		pthread_mutex_unlock(&queue->lock);
-		return NULL;
+		if (subscriber_index == -1) // Watek nie jest subskrybentem
+		{
+			pthread_mutex_unlock(&queue->lock);
+			return NULL;
+		}
 	}
 
 	// Pobierz wiadomosc

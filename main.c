@@ -5,10 +5,11 @@
 #include <string.h>
 #include "queue.h"
 
-void single_thread_test()
+void test_single_thread()
 {
-	const pthread_t thread_ID = 1337;
-	const int QUEUE_SIZE = 6;
+	printf("========== SINGLE THREAD TEST ==========\n");
+	const int QUEUE_SIZE = 6; // Rozmiar kolejki
+	const pthread_t thread_ID = 1337; // ID watku
 
 	// Tworzenie kolejki
 	TQueue *queue;
@@ -114,7 +115,7 @@ void single_thread_test()
 
 
 
-void* thread_func_add(void *arg)
+void* test_brute_force_func_add(void *arg)
 {
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
 	int *msg = NULL; // Wskaznik do wiadomosci
@@ -135,7 +136,7 @@ void* thread_func_add(void *arg)
 	return NULL;
 }
 
-void* thread_func_read(void *arg)
+void* test_brute_force_func_read(void *arg)
 {
 	pthread_t thread_ID = pthread_self(); // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
@@ -161,9 +162,43 @@ void* thread_func_read(void *arg)
 	return NULL;
 }
 
+void test_brute_force()
+{
+	printf("========== BRUTE FORCE TEST ==========\n");
+	const int QUEUE_SIZE=2; // Rozmiar kolejki
+	const int THREADS_NUM=10000; // Liczba watkow (10000*200 = 2000000ms = 2s)
+	const int THREADS_INTERVAL=200; // Odstep czasowy miedzy watkami (200ms)
+	pthread_t threads[THREADS_NUM];
+
+	// Tworzenie kolejki
+	TQueue *queue;
+	queue = createQueue(QUEUE_SIZE);
+	printf("Queue created with size '%d'\n", QUEUE_SIZE);
+
+	// Tworzenie watkow
+	pthread_create(&threads[0], NULL, test_brute_force_func_add, queue);
+	for (int i=1; i<THREADS_NUM; i++)
+	{
+		pthread_create(&threads[i], NULL, test_brute_force_func_read, queue);
+		usleep(THREADS_INTERVAL); // Dodanie 20 wiadomosci zajmie okolo 50*20 = 1000ms
+	}
+
+	// Czekanie na zakonczenie watkow
+	for (int i=1; i<THREADS_NUM; i++)
+	{
+		pthread_join(threads[i], NULL);
+	}
+
+	// Zakonczenie dodawania
+	pthread_cancel(threads[0]);
+
+	// Zniszczenie kolejki
+	destroyQueue(queue);
+}
 
 
-void* timer(void *arg)
+
+void* test_multi_thread_func_timer(void *arg)
 {
 	usleep(500000); // 0.5 sekundy
 
@@ -177,7 +212,7 @@ void* timer(void *arg)
 	return NULL;
 }
 
-void* thread_func_1(void *arg)
+void* test_multi_thread_func_1(void *arg)
 {
 	pthread_t thread_ID = 1; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
@@ -235,7 +270,7 @@ void* thread_func_1(void *arg)
 	return NULL;
 }
 
-void* thread_func_2(void *arg)
+void* test_multi_thread_func_2(void *arg)
 {
 	pthread_t thread_ID = 2; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
@@ -287,7 +322,7 @@ void* thread_func_2(void *arg)
 	return NULL;
 }
 
-void* thread_func_3(void *arg)
+void* test_multi_thread_func_3(void *arg)
 {
 	pthread_t thread_ID = 3; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
@@ -317,7 +352,7 @@ void* thread_func_3(void *arg)
 	return NULL;
 }
 
-void* thread_func_4(void *arg)
+void* test_multi_thread_func_4(void *arg)
 {
 	pthread_t thread_ID = 4; // ID watku
 	TQueue *queue = (TQueue*)arg; // Wskaznik do kolejki
@@ -336,91 +371,64 @@ void* thread_func_4(void *arg)
 	return NULL;
 }
 
+void test_multi_thread()
+{
+	printf("========== MULTI THREAD TEST ==========\n");
+	const int QUEUE_SIZE=1; // Rozmiar kolejki
+	const int THREADS_NUM=5; // Liczba watkow
+	pthread_t threads[THREADS_NUM];
+
+	// Tworzenie kolejki
+	TQueue *queue;
+	queue = createQueue(QUEUE_SIZE);
+	printf("Queue created with size '%d'\n", QUEUE_SIZE);
+
+	// Tworzenie watkow
+	pthread_create(&threads[0], NULL, test_multi_thread_func_1, queue);
+	pthread_create(&threads[1], NULL, test_multi_thread_func_2, queue);
+	pthread_create(&threads[2], NULL, test_multi_thread_func_3, queue);
+	pthread_create(&threads[3], NULL, test_multi_thread_func_4, queue);
+
+	// Tworzenie timera
+	pthread_create(&threads[4], NULL, test_multi_thread_func_timer, NULL);
+
+	// Czekanie na zakonczenie watkow
+	for (int i=0; i<THREADS_NUM-1; i++)
+	{
+		pthread_join(threads[i], NULL);
+	}
+
+	// Zakonczenie timera
+	pthread_cancel(threads[4]);
+
+	// Zniszczenie kolejki
+	destroyQueue(queue);
+}
+
 
 
 int main()
 {
-	const int DO_TEST_SINGLE = 1;
-	const int DO_TEST_BRUTE = 1;
-	const int DO_TEST_MULTI = 1;
+	printf("Publish-subscribe (20 pkt)\n");
+	printf("Programowanie systemowe i wspolbiezne\n");
+	printf("Kacper Skaza 160 174\n\n");
+	const int DO_TEST_SINGLE = 1, DO_TEST_BRUTE = 1, DO_TEST_MULTI = 1;
 
-	if (DO_TEST_SINGLE)
+	if (DO_TEST_SINGLE) // Testy na pojedynczym watku
 	{
-		// Testy na pojedynczym watku
-		printf("========== SINGLE THREAD TEST ==========\n");
-		single_thread_test();
+		test_single_thread();
 		printf("END\n\n");
 	}
 
-	if (DO_TEST_BRUTE)
+	if (DO_TEST_BRUTE) // Testy silowe
 	{
-		// Testy na wielu watkach
-		printf("========== BRUTE FORCE TEST ==========\n");
-		const int THREADS_INTERVAL=200; // Odstep czasowy miedzy watkami (200ms)
-		const int THREADS_NUM=10000; // Liczba watkow (10000*200 = 2000000ms = 2s)
-		const int QUEUE_SIZE=1000; // Rozmiar kolejki
-		pthread_t threads[THREADS_NUM];
-
-		// Tworzenie kolejki
-		TQueue *queue;
-		queue = createQueue(QUEUE_SIZE);
-		printf("Queue created with size '%d'\n", QUEUE_SIZE);
-
-		// Tworzenie watkow
-		pthread_create(&threads[0], NULL, thread_func_add, queue);
-		for (int i=1; i<THREADS_NUM; i++)
-		{
-			pthread_create(&threads[i], NULL, thread_func_read, queue);
-			usleep(THREADS_INTERVAL); // Dodanie 20 wiadomosci zajmie okolo 50*20 = 1000ms
-		}
-
-		// Czekanie na zakonczenie watkow
-		for (int i=1; i<THREADS_NUM; i++)
-		{
-			pthread_join(threads[i], NULL);
-		}
-
-		// Zakonczenie dodawania
-		pthread_cancel(threads[0]);
-
-		// Zniszczenie kolejki
-		destroyQueue(queue);
+		test_brute_force();
 		printf("END\n\n");
 	}
 
-	if (DO_TEST_MULTI)
+	if (DO_TEST_MULTI) // Testy na wielu watkach
 	{
-		// Testy na wielu watkach
-		printf("========== MULTI THREAD TEST ==========\n");
-		const int THREADS_NUM=5; // Liczba watkow
-		const int QUEUE_SIZE=1; // Rozmiar kolejki
-		pthread_t threads[THREADS_NUM];
-
-		// Tworzenie kolejki
-		TQueue *queue;
-		queue = createQueue(QUEUE_SIZE);
-		printf("Queue created with size '%d'\n", QUEUE_SIZE);
-
-		// Tworzenie watkow
-		pthread_create(&threads[0], NULL, thread_func_1, queue);
-		pthread_create(&threads[1], NULL, thread_func_2, queue);
-		pthread_create(&threads[2], NULL, thread_func_3, queue);
-		pthread_create(&threads[3], NULL, thread_func_4, queue);
-
-		// Tworzenie timera
-		pthread_create(&threads[4], NULL, timer, NULL);
-
-		// Czekanie na zakonczenie watkow
-		for (int i=0; i<THREADS_NUM-1; i++)
-		{
-			pthread_join(threads[i], NULL);
-		}
-
-		// Zakonczenie timera
-		pthread_cancel(threads[4]);
-
-		// Zniszczenie kolejki
-		destroyQueue(queue);
+		test_multi_thread();
 		printf("END\n");
 	}
 
